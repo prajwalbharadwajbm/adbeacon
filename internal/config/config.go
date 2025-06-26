@@ -1,9 +1,8 @@
 package config
 
 import (
-	"log"
-
 	"github.com/joho/godotenv"
+	"github.com/prajwalbharadwajbm/adbeacon/internal/logger"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/utils"
 )
 
@@ -21,7 +20,7 @@ type appConfig struct {
 func LoadConfigs() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Error loading .env files: ", err)
+		logger.Log.Warnf("Warning: Error loading .env files: %v", err)
 	}
 
 	loadGeneralCongigs()

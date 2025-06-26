@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/prajwalbharadwajbm/adbeacon/internal/config"
-	"github.com/rs/zerolog/log"
+	"github.com/prajwalbharadwajbm/adbeacon/internal/logger"
 )
 
 // Health is required to check
@@ -29,7 +29,7 @@ func Health(w http.ResponseWriter, r *http.Request) {
 
 	healthObj, err := json.Marshal(envelope)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to marshal health check response")
+		logger.Log.Error("failed to marshal health check response", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
