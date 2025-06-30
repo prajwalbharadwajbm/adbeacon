@@ -87,3 +87,41 @@ func (db *DB) RunMigrations(migrationsPath string) error {
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
+
+// Initialize sets up the complete database with connection, migrations, and returns cleanup function
+func Initialize(cfg config.DatabaseConfig, migrationsPath string) (*DB, func(), error) {
+	// Ensure database exists
+	if err := EnsureDatabase(cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to ensure database exists: %w", err)
+	}
+
+	// Connect to database
+	db, err := NewConnection(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Run migrations
+	migrationManager := NewMigrationManager(db, migrationsPath)
+	if err := migrationManager.Up(); err != nil {
+		db.Close()
+		return nil, nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Create cleanup function
+	cleanup := func() {
+		if err := db.Close(); err != nil {
+			// Note: Using fmt.Printf instead of log to avoid importing log package
+			// The caller can handle logging as needed
+			fmt.Printf("Error closing database connection: %v\n", err)
+		}
+	}
+
+	// Final health check
+	if err := db.HealthCheck(); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("database health check failed: %w", err)
+	}
+
+	return db, cleanup, nil
+}
