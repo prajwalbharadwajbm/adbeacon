@@ -2,3 +2,9 @@
 .vscode
 
 .env
+
+# go binaries
+adbeacon
+main
+adbeacon.exe
+main.exe
