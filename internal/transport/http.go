@@ -8,12 +8,18 @@ import (
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/go-kit/log"
 	"github.com/gorilla/mux"
+	"github.com/prajwalbharadwajbm/adbeacon/internal/database"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/endpoint"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/models"
 )
 
 // NewHTTPHandler creates HTTP handlers for delivery service
 func NewHTTPHandler(endpoints endpoint.DeliveryEndpoints, logger log.Logger) http.Handler {
+	return NewHTTPHandlerWithDB(endpoints, logger, nil)
+}
+
+// NewHTTPHandlerWithDB creates HTTP handlers for delivery service with database health check
+func NewHTTPHandlerWithDB(endpoints endpoint.DeliveryEndpoints, logger log.Logger, db *database.DB) http.Handler {
 	options := []httptransport.ServerOption{
 		httptransport.ServerErrorEncoder(encodeError),
 	}
@@ -30,8 +36,8 @@ func NewHTTPHandler(endpoints endpoint.DeliveryEndpoints, logger log.Logger) htt
 	// Main delivery endpoint
 	r.Handle("/v1/delivery", getCampaignsHandler).Methods("GET")
 
-	// Health check endpoint
-	r.HandleFunc("/health", healthHandler).Methods("GET")
+	// Health check endpoint with database check
+	r.HandleFunc("/health", createHealthHandler(db)).Methods("GET")
 
 	return r
 }
@@ -90,15 +96,45 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(errorResponse)
 }
 
-// healthHandler handles health check requests
-func healthHandler(w http.ResponseWriter, r *http.Request) {
-	response := map[string]any{
-		"status":  "healthy",
-		"service": "adbeacon",
-		"version": "1.0.0",
-	}
+// createHealthHandler creates a health handler with optional database check
+func createHealthHandler(db *database.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]any{
+			"status":  "healthy",
+			"service": "adbeacon",
+			"version": "1.0.0",
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+		// Check database health if available
+		if db != nil {
+			if err := db.HealthCheck(); err != nil {
+				response["status"] = "unhealthy"
+				response["database"] = "unhealthy"
+				response["error"] = err.Error()
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+			response["database"] = "healthy"
+
+			// Add connection stats
+			stats := db.GetConnectionStats()
+			response["database_stats"] = map[string]any{
+				"open_connections":     stats.OpenConnections,
+				"in_use":               stats.InUse,
+				"idle":                 stats.Idle,
+				"wait_count":           stats.WaitCount,
+				"wait_duration":        stats.WaitDuration.String(),
+				"max_idle_closed":      stats.MaxIdleClosed,
+				"max_idle_time_closed": stats.MaxIdleTimeClosed,
+				"max_lifetime_closed":  stats.MaxLifetimeClosed,
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
 }
