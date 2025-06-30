@@ -1,0 +1,154 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "AdBeacon - Campaign Delivery Service",
+    "tags": ["adbeacon", "campaigns", "delivery"],
+    "timezone": "browser",
+    "refresh": "5s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Requests per Second",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(adbeacon_http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}} ({{status_code}})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {"displayMode": "list", "orientation": "horizontal"},
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Campaign Deliveries by App",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "adbeacon_campaigns_delivered_total",
+            "legendFormat": "{{app}} ({{country}}/{{os}})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {"displayMode": "table", "calculation": "lastNotNull"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "HTTP Request Duration (95th percentile)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(adbeacon_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{endpoint}} - 95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(adbeacon_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{endpoint}} - 50th percentile",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Database Query Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(adbeacon_database_queries_total[5m])",
+            "legendFormat": "{{operation}} on {{table}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "qps"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Requests In Flight",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "adbeacon_http_requests_in_flight",
+            "legendFormat": "{{method}} {{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            },
+            "max": 20,
+            "min": 0
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Health Check Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "adbeacon_health_check_status",
+            "legendFormat": "{{check_type}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 24, "x": 0, "y": 24},
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "Unhealthy"}}, "type": "value"},
+              {"options": {"1": {"text": "Healthy"}}, "type": "value"}
+            ]
+          }
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+} 
