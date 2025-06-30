@@ -48,7 +48,10 @@ func (r *DeliveryRequest) GetDimensionValue(dimension TargetDimension) string {
 	}
 }
 
-// MatchesRule checks if request matches a specific targeting rule
+// MatchesRule checks if a targeting rule applies to this request.
+// For include rules: returns true if the request value is in the rule's allowed values
+// For exclude rules: returns true if the request value is in the rule's excluded values
+// This method determines if the rule "triggers" for this request, not if the request "passes" the rule
 func (r *DeliveryRequest) MatchesRule(rule TargetingRule) bool {
 	requestValue := r.GetDimensionValue(rule.Dimension)
 	if requestValue == "" {
@@ -59,14 +62,16 @@ func (r *DeliveryRequest) MatchesRule(rule TargetingRule) bool {
 	normalizedValues := rule.NormalizeValues()
 
 	// Check if request value exists in rule values
-	valueExists := slices.Contains(normalizedValues, requestValue)
+	valueInRuleList := slices.Contains(normalizedValues, requestValue)
 
-	// Apply include/exclude logic
+	// Return whether this rule applies to the request
 	switch rule.RuleType {
 	case RuleTypeInclude:
-		return valueExists
+		// Include rule applies if the value is in the allowed list
+		return valueInRuleList
 	case RuleTypeExclude:
-		return !valueExists
+		// Exclude rule applies if the value is in the excluded list
+		return valueInRuleList
 	default:
 		return false
 	}
