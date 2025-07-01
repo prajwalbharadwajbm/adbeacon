@@ -89,12 +89,18 @@ func encodeGetCampaignsResponse(ctx context.Context, w http.ResponseWriter, resp
 func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Check for validation errors
-	if err.Error() == "missing app param" ||
-		err.Error() == "missing country param" ||
-		err.Error() == "missing os param" {
+	// Check for validation errors - these should return 400 Bad Request
+	errorMsg := err.Error()
+	if errorMsg == "country is required" ||
+		errorMsg == "country must be a 2-letter code" ||
+		errorMsg == "os is required" ||
+		errorMsg == "app is required" ||
+		errorMsg == "missing app param" ||
+		errorMsg == "missing country param" ||
+		errorMsg == "missing os param" {
 		w.WriteHeader(http.StatusBadRequest)
 	} else {
+		// All other errors are internal server errors
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
