@@ -5,7 +5,7 @@ echo ""
 
 # Start the monitoring stack
 echo "Starting Prometheus and Grafana..."
-docker-compose -f docker-compose.monitoring.yml up -d
+docker compose -f docker-compose.monitoring.yml up -d
 
 echo ""
 echo "Monitoring stack is starting up!"
