@@ -6,44 +6,57 @@ import (
 	"strings"
 )
 
-// DeliveryRequest represents the incoming targeting request
+// DeliveryRequest represents a request for ad delivery
 type DeliveryRequest struct {
+	Country string `json:"country" validate:"required,len=2"`
+	OS      string `json:"os" validate:"required,oneof=android ios"`
 	App     string `json:"app" validate:"required"`
-	Country string `json:"country" validate:"required"`
-	OS      string `json:"os" validate:"required"`
 }
 
-// Validate checks if the request has all required parameters
-func (r *DeliveryRequest) Validate() error {
-	if strings.TrimSpace(r.App) == "" {
-		return errors.New("missing app param")
+// Validate validates the delivery request
+func (dr *DeliveryRequest) Validate() error {
+	if dr.Country == "" {
+		return errors.New("country is required")
 	}
-	if strings.TrimSpace(r.Country) == "" {
-		return errors.New("missing country param")
+	if len(dr.Country) != 2 {
+		return errors.New("country must be a 2-letter code")
 	}
-	if strings.TrimSpace(r.OS) == "" {
-		return errors.New("missing os param")
+	if dr.OS == "" {
+		return errors.New("os is required")
+	}
+	if dr.App == "" {
+		return errors.New("app is required")
 	}
 	return nil
 }
 
-// Normalize converts request values to lowercase for consistent comparison
-func (r *DeliveryRequest) Normalize() {
-	r.App = strings.TrimSpace(r.App)
-	r.Country = strings.ToLower(strings.TrimSpace(r.Country))
-	r.OS = strings.ToLower(strings.TrimSpace(r.OS))
+// NormalizeValues normalizes request values for consistent comparison
+func (dr *DeliveryRequest) NormalizeValues() {
+	dr.Country = strings.ToLower(strings.TrimSpace(dr.Country))
+	dr.OS = strings.ToLower(strings.TrimSpace(dr.OS))
+	dr.App = strings.TrimSpace(dr.App) // App IDs are case-sensitive
 }
 
-// GetDimensionValue returns the value for a specific targeting dimension
-func (r *DeliveryRequest) GetDimensionValue(dimension TargetDimension) string {
+// ToMap converts the request to a map for extensible dimension processing
+func (dr *DeliveryRequest) ToMap() map[string]string {
+	return map[string]string{
+		"country": dr.Country,
+		"os":      dr.OS,
+		"app":     dr.App,
+	}
+}
+
+// GetDimensionValue gets a value for a specific dimension using the extensible system
+func (dr *DeliveryRequest) GetDimensionValue(dimension string) string {
 	switch dimension {
-	case DimensionApp:
-		return r.App
-	case DimensionCountry:
-		return strings.ToLower(r.Country)
-	case DimensionOS:
-		return strings.ToLower(r.OS)
+	case "country":
+		return dr.Country
+	case "os":
+		return dr.OS
+	case "app":
+		return dr.App
 	default:
+		// For extensible dimensions, return empty (can be extended later)
 		return ""
 	}
 }
@@ -53,7 +66,7 @@ func (r *DeliveryRequest) GetDimensionValue(dimension TargetDimension) string {
 // For exclude rules: returns true if the request value is in the rule's excluded values
 // This method determines if the rule "triggers" for this request, not if the request "passes" the rule
 func (r *DeliveryRequest) MatchesRule(rule TargetingRule) bool {
-	requestValue := r.GetDimensionValue(rule.Dimension)
+	requestValue := r.GetDimensionValue(string(rule.Dimension))
 	if requestValue == "" {
 		return false
 	}

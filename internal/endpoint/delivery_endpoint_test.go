@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockDeliveryService is a mock implementation of service.DeliveryService
+// MockDeliveryService is a mock implementation of service.CampaignDeliveryService
 type MockDeliveryService struct {
 	mock.Mock
 }

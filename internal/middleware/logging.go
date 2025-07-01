@@ -13,12 +13,12 @@ import (
 // loggingMiddleware implements logging middleware for DeliveryService
 type loggingMiddleware struct {
 	logger log.Logger
-	next   service.DeliveryService
+	next   service.CampaignDeliveryService
 }
 
 // NewLoggingMiddleware creates a new logging middleware
-func NewLoggingMiddleware(logger log.Logger) func(service.DeliveryService) service.DeliveryService {
-	return func(next service.DeliveryService) service.DeliveryService {
+func NewLoggingMiddleware(logger log.Logger) func(service.CampaignDeliveryService) service.CampaignDeliveryService {
+	return func(next service.CampaignDeliveryService) service.CampaignDeliveryService {
 		return &loggingMiddleware{
 			logger: logger,
 			next:   next,

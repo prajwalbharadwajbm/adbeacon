@@ -14,7 +14,7 @@ type DeliveryEndpoints struct {
 }
 
 // MakeDeliveryEndpoints creates endpoints for delivery service
-func MakeDeliveryEndpoints(s service.DeliveryService) DeliveryEndpoints {
+func MakeDeliveryEndpoints(s service.CampaignDeliveryService) DeliveryEndpoints {
 	return DeliveryEndpoints{
 		GetCampaignsEndpoint: makeGetCampaignsEndpoint(s),
 	}
@@ -37,7 +37,7 @@ func (r GetCampaignsResponse) Failed() error {
 }
 
 // makeGetCampaignsEndpoint creates the endpoint for getting campaigns
-func makeGetCampaignsEndpoint(s service.DeliveryService) endpoint.Endpoint {
+func makeGetCampaignsEndpoint(s service.CampaignDeliveryService) endpoint.Endpoint {
 	return func(ctx context.Context, request any) (any, error) {
 		req := request.(GetCampaignsRequest)
 		campaigns, err := s.GetCampaigns(ctx, req.DeliveryRequest)

@@ -1,73 +1,58 @@
 package models
 
+import (
+	"fmt"
+)
+
 // CampaignWithRules represents a campaign with its targeting rules
 type CampaignWithRules struct {
 	Campaign
 	Rules []TargetingRule `json:"rules,omitempty"`
 }
 
-// MatchesRequest checks if this campaign matches the delivery request
-func (cwr *CampaignWithRules) MatchesRequest(req DeliveryRequest) bool {
-	// Only active campaigns can match
-	if !cwr.IsActive() {
-		return false
-	}
+// Global campaign matcher instance (can be configured)
+var defaultCampaignMatcher *CampaignMatcher
 
-	// If no rules exist, campaign matches everyone
-	if len(cwr.Rules) == 0 {
-		return true
-	}
-
-	// Group rules by dimension
-	rulesByDimension := make(map[TargetDimension][]TargetingRule)
-	for _, rule := range cwr.Rules {
-		rulesByDimension[rule.Dimension] = append(rulesByDimension[rule.Dimension], rule)
-	}
-
-	// Check each dimension
-	for _, rules := range rulesByDimension {
-		if !dimensionMatches(req, rules) {
-			return false
-		}
-	}
-
-	return true
+func init() {
+	// Initialize default campaign matcher with built-in processors
+	registry := NewDimensionRegistry()
+	defaultCampaignMatcher = NewCampaignMatcher(registry)
 }
 
-// dimensionMatches checks if request matches rules for a specific dimension
-func dimensionMatches(req DeliveryRequest, rules []TargetingRule) bool {
-	var includeRules, excludeRules []TargetingRule
+// MatchesRequest checks if this campaign matches the delivery request using the extensible system
+func (cwr *CampaignWithRules) MatchesRequest(req DeliveryRequest) bool {
+	return defaultCampaignMatcher.MatchesRequest(*cwr, req)
+}
 
-	// Separate include and exclude rules
-	for _, rule := range rules {
-		switch rule.RuleType {
-		case RuleTypeInclude:
-			includeRules = append(includeRules, rule)
-		case RuleTypeExclude:
-			excludeRules = append(excludeRules, rule)
+// MatchesRequestWithMatcher checks if this campaign matches using a custom matcher
+func (cwr *CampaignWithRules) MatchesRequestWithMatcher(req DeliveryRequest, matcher *CampaignMatcher) bool {
+	return matcher.MatchesRequest(*cwr, req)
+}
+
+// ValidateRules validates all targeting rules for this campaign
+func (cwr *CampaignWithRules) ValidateRules() []error {
+	var errors []error
+
+	for i, rule := range cwr.Rules {
+		if err := defaultCampaignMatcher.ValidateTargetingRule(rule); err != nil {
+			errors = append(errors, fmt.Errorf("rule %d: %w", i, err))
 		}
 	}
 
-	// If there are include rules, request must match at least one
-	if len(includeRules) > 0 {
-		matched := false
-		for _, rule := range includeRules {
-			if req.MatchesRule(rule) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
+	return errors
+}
 
-	// If there are exclude rules, request must not match any
-	for _, rule := range excludeRules {
-		if req.MatchesRule(rule) {
-			return false
-		}
-	}
+// GetDimensionRegistry returns the default dimension registry
+func GetDimensionRegistry() *DimensionRegistry {
+	return defaultCampaignMatcher.Registry
+}
 
-	return true
+// SetDefaultCampaignMatcher sets a custom campaign matcher as default
+func SetDefaultCampaignMatcher(matcher *CampaignMatcher) {
+	defaultCampaignMatcher = matcher
+}
+
+// ToResponse converts Campaign to CampaignResponse
+func (cwr *CampaignWithRules) ToResponse() CampaignResponse {
+	return cwr.Campaign.ToResponse()
 }

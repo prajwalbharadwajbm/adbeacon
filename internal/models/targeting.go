@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -24,6 +25,11 @@ const (
 	DimensionCountry TargetDimension = "country"
 	DimensionOS      TargetDimension = "os"
 	DimensionApp     TargetDimension = "app"
+
+	// Extended dimensions (examples)
+	DimensionDeviceType TargetDimension = "device_type"
+	DimensionAgeGroup   TargetDimension = "age_group"
+	DimensionTimeOfDay  TargetDimension = "time_of_day"
 )
 
 // RuleType represents include/exclude rule types
@@ -37,21 +43,20 @@ const (
 
 // IsValid methods for validation
 func (td TargetDimension) IsValid() bool {
-	return td == DimensionCountry || td == DimensionOS || td == DimensionApp
+	// Use the extensible system for validation
+	registry := GetDimensionRegistry()
+	_, exists := registry.GetProcessor(string(td))
+	return exists
 }
 
 func (rt RuleType) IsValid() bool {
 	return rt == RuleTypeInclude || rt == RuleTypeExclude
 }
 
-// Validate checks if targeting rule is valid
+// Validate checks if targeting rule is valid using the extensible system
 func (tr *TargetingRule) Validate() error {
 	if tr.CampaignID == "" {
 		return errors.New("campaign_id is required")
-	}
-
-	if !tr.Dimension.IsValid() {
-		return errors.New("invalid dimension")
 	}
 
 	if !tr.RuleType.IsValid() {
@@ -62,14 +67,50 @@ func (tr *TargetingRule) Validate() error {
 		return errors.New("values cannot be empty")
 	}
 
-	return nil
+	// Use extensible validation
+	registry := GetDimensionRegistry()
+	processor, exists := registry.GetProcessor(string(tr.Dimension))
+	if !exists {
+		return fmt.Errorf("unknown dimension: %s", tr.Dimension)
+	}
+
+	return processor.ValidateRule(*tr)
 }
 
-// NormalizeValues cleans/normalizes rule values for standard comparison
+// NormalizeValues cleans/normalizes rule values using the appropriate processor
 func (tr *TargetingRule) NormalizeValues() []string {
+	registry := GetDimensionRegistry()
+	processor, exists := registry.GetProcessor(string(tr.Dimension))
+	if !exists {
+		// Fallback to basic normalization
+		normalized := make([]string, len(tr.Values))
+		for i, v := range tr.Values {
+			normalized[i] = strings.ToLower(strings.TrimSpace(v))
+		}
+		return normalized
+	}
+
+	// Use processor-specific normalization
 	normalized := make([]string, len(tr.Values))
 	for i, v := range tr.Values {
-		normalized[i] = strings.ToLower(strings.TrimSpace(v))
+		normalized[i] = processor.NormalizeValue(v)
 	}
 	return normalized
+}
+
+// GetSupportedDimensions returns all supported dimensions
+func GetSupportedDimensions() []string {
+	registry := GetDimensionRegistry()
+	return registry.ListDimensions()
+}
+
+// RegisterCustomDimension adds a new dimension processor to the global registry
+func RegisterCustomDimension(processor DimensionProcessor) {
+	registry := GetDimensionRegistry()
+	registry.RegisterProcessor(processor)
+}
+
+// CreateCustomTargetDimension creates a new custom dimension
+func CreateCustomTargetDimension(name string) TargetDimension {
+	return TargetDimension(name)
 }

@@ -64,7 +64,7 @@ func main() {
 	cachedRepo := setupCachedRepository(db, cache)
 
 	// Service layer with middleware
-	var deliveryService service.DeliveryService
+	var deliveryService service.CampaignDeliveryService
 	deliveryService = service.NewDeliveryService(cachedRepo)
 	deliveryService = middleware.NewServiceMetricsMiddleware(prometheusMetrics)(deliveryService)
 	deliveryService = middleware.NewLoggingMiddleware(logger)(deliveryService)

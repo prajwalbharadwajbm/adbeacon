@@ -25,7 +25,7 @@ func TestNewDeliveryService(t *testing.T) {
 	service := NewDeliveryService(mockRepo)
 
 	assert.NotNil(t, service)
-	assert.IsType(t, &deliveryService{}, service)
+	assert.IsType(t, &DeliveryService{}, service)
 }
 
 func TestDeliveryService_GetCampaigns_InvalidRequest(t *testing.T) {
@@ -43,7 +43,7 @@ func TestDeliveryService_GetCampaigns_InvalidRequest(t *testing.T) {
 				Country: "US",
 				OS:      "Android",
 			},
-			wantErr: "missing app param",
+			wantErr: "app is required",
 		},
 		{
 			name: "missing country",
@@ -51,7 +51,7 @@ func TestDeliveryService_GetCampaigns_InvalidRequest(t *testing.T) {
 				App: "com.test.app",
 				OS:  "Android",
 			},
-			wantErr: "missing country param",
+			wantErr: "country is required",
 		},
 		{
 			name: "missing os",
@@ -59,12 +59,12 @@ func TestDeliveryService_GetCampaigns_InvalidRequest(t *testing.T) {
 				App:     "com.test.app",
 				Country: "US",
 			},
-			wantErr: "missing os param",
+			wantErr: "os is required",
 		},
 		{
 			name:    "all missing",
 			request: models.DeliveryRequest{},
-			wantErr: "missing app param",
+			wantErr: "country is required",
 		},
 	}
 
@@ -196,7 +196,7 @@ func TestDeliveryService_GetCampaigns_InactiveCampaignsFiltered(t *testing.T) {
 
 	// Setup mock with inactive campaigns (should be filtered out by repository)
 	campaigns := []models.CampaignWithRules{
-		createTestCampaign("active", models.StatusActive, []models.TargetingRule{
+		createTestCampaign("ACTIVE", models.StatusActive, []models.TargetingRule{
 			{
 				Dimension: models.DimensionCountry,
 				RuleType:  models.RuleTypeInclude,
@@ -217,7 +217,7 @@ func TestDeliveryService_GetCampaigns_InactiveCampaignsFiltered(t *testing.T) {
 	result, err := service.GetCampaigns(context.Background(), request)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
-	assert.Equal(t, "active", result[0].CID)
+	assert.Equal(t, "ACTIVE", result[0].CID)
 
 	mockRepo.AssertExpectations(t)
 }
