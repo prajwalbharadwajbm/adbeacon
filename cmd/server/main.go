@@ -61,7 +61,7 @@ func main() {
 	log.Println("Cache initialized successfully")
 
 	// Repository layer (data access) with caching
-	cachedRepo := setupCachedRepository(db, cache)
+	cachedRepo := setupCachedRepository(db, cache, prometheusMetrics)
 
 	// Service layer with middleware
 	var deliveryService service.CampaignDeliveryService
@@ -139,12 +139,11 @@ func initializeCache() (*cache.HybridCache, error) {
 }
 
 // Add this to show how to wire up cached repository
-func setupCachedRepository(db *database.DB, hybridCache *cache.HybridCache) service.CampaignRepository {
+func setupCachedRepository(db *database.DB, hybridCache *cache.HybridCache, prometheusMetrics *metrics.Metrics) service.CampaignRepository {
 	// Original repository
 	baseRepo := repository.NewPostgresRepository(db)
 
-	// Wrap with instrumentation
-	prometheusMetrics := metrics.NewPrometheusMetrics()
+	// Wrap with instrumentation (reuse existing metrics instance)
 	instrumentedRepo := repository.NewInstrumentedRepository(baseRepo, prometheusMetrics)
 
 	// Wrap with caching (5-minute TTL)
