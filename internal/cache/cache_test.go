@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -242,4 +243,77 @@ func BenchmarkCacheMiss_Memory(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestHybridCache_HealthCheck(t *testing.T) {
+	config := CacheConfig{
+		DefaultTTL:      time.Minute,
+		MemoryCacheSize: 100,
+		EnableMemory:    true,
+		EnableRedis:     false, // Disable Redis for this test
+	}
+
+	cache, err := NewHybridCache(config)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Test health check
+	health := cache.HealthCheck(ctx)
+
+	// Verify overall health structure
+	assert.Contains(t, []string{"healthy", "degraded", "unhealthy"}, health.Overall)
+	assert.True(t, health.Uptime > 0)
+	assert.False(t, health.LastTest.IsZero())
+
+	// Verify memory cache health
+	assert.True(t, health.Memory.Enabled)
+	assert.Equal(t, "healthy", health.Memory.Status)
+	assert.Equal(t, 100, health.Memory.MaxSize)
+	assert.Equal(t, 0, health.Memory.Size) // Empty cache
+	assert.Equal(t, 0.0, health.Memory.UtilPct)
+
+	// Verify Redis cache health (should be disabled)
+	assert.False(t, health.Redis.Enabled)
+	assert.Equal(t, "disabled", health.Redis.Status)
+	assert.False(t, health.Redis.Connected)
+}
+
+func TestHybridCache_HealthCheck_WithData(t *testing.T) {
+	config := CacheConfig{
+		DefaultTTL:      time.Minute,
+		MemoryCacheSize: 10, // Small cache for testing utilization
+		EnableMemory:    true,
+		EnableRedis:     false,
+	}
+
+	cache, err := NewHybridCache(config)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Add some data to test utilization
+	campaigns := []models.CampaignWithRules{
+		{Campaign: models.Campaign{ID: "test1", Status: models.StatusActive}},
+		{Campaign: models.Campaign{ID: "test2", Status: models.StatusActive}},
+		{Campaign: models.Campaign{ID: "test3", Status: models.StatusActive}},
+	}
+
+	err = cache.SetActiveCampaigns(ctx, campaigns, time.Minute)
+	require.NoError(t, err)
+
+	// Add several cache indexes to increase utilization
+	for i := 0; i < 8; i++ {
+		key := fmt.Sprintf("country%d", i)
+		err = cache.SetCampaignIndex(ctx, models.DimensionCountry, key, []string{"campaign1"}, time.Minute)
+		require.NoError(t, err)
+	}
+
+	// Test health check with high utilization
+	health := cache.HealthCheck(ctx)
+
+	// Should still be healthy but with higher utilization
+	assert.Equal(t, "healthy", health.Overall)
+	assert.True(t, health.Memory.UtilPct > 50) // Should be fairly utilized
+	assert.True(t, health.Memory.Size > 0)
 }

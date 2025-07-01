@@ -72,8 +72,8 @@ func main() {
 	// Endpoint layer (request/response handling)
 	endpoints := endpoint.MakeDeliveryEndpoints(deliveryService)
 
-	// Transport layer (HTTP) with database health check
-	httpHandler := transport.NewHTTPHandlerWithDB(endpoints, logger, db)
+	// Transport layer (HTTP) with database and cache health checks
+	httpHandler := transport.NewHTTPHandlerWithCache(endpoints, logger, db, cache)
 
 	// Add request ID middleware (first in chain to ensure all requests have IDs)
 	requestIDMiddleware := middleware.NewRequestIDMiddleware()

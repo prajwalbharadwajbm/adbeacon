@@ -22,6 +22,9 @@ type Cache interface {
 	// Cache management
 	InvalidateAll(ctx context.Context) error
 	GetStats() CacheStats
+
+	// Health check operations
+	HealthCheck(ctx context.Context) CacheHealth
 }
 
 // CacheStats holds cache performance statistics
@@ -32,6 +35,36 @@ type CacheStats struct {
 	HitRatio    float64
 	TotalOps    int64
 	LastUpdated time.Time
+}
+
+// CacheHealth represents comprehensive cache health information
+type CacheHealth struct {
+	Overall  string            `json:"overall"` // "healthy", "degraded", "unhealthy"
+	Memory   MemoryCacheHealth `json:"memory"`
+	Redis    RedisCacheHealth  `json:"redis"`
+	Stats    CacheStats        `json:"stats"`
+	Uptime   time.Duration     `json:"uptime"`
+	LastTest time.Time         `json:"last_test"`
+}
+
+// MemoryCacheHealth represents in-memory cache health
+type MemoryCacheHealth struct {
+	Enabled     bool    `json:"enabled"`
+	Status      string  `json:"status"`       // "healthy", "unhealthy"
+	Size        int     `json:"size"`         // Current number of items
+	MaxSize     int     `json:"max_size"`     // Maximum capacity
+	UtilPct     float64 `json:"util_pct"`     // Utilization percentage
+	EvictedKeys int64   `json:"evicted_keys"` // Number of evicted keys
+}
+
+// RedisCacheHealth represents Redis cache health
+type RedisCacheHealth struct {
+	Enabled   bool          `json:"enabled"`
+	Status    string        `json:"status"` // "healthy", "unhealthy", "disconnected"
+	Connected bool          `json:"connected"`
+	Address   string        `json:"address"`
+	Latency   time.Duration `json:"latency"` // Ping latency
+	Error     string        `json:"error,omitempty"`
 }
 
 // HybridCache implements both in-memory and Redis caching
@@ -46,6 +79,8 @@ type HybridCache struct {
 	// Metrics
 	stats CacheStats
 	mu    sync.RWMutex
+	// Add startTime tracking to HybridCache
+	startTime time.Time
 }
 
 // CacheConfig holds cache configuration
@@ -67,6 +102,7 @@ func NewHybridCache(config CacheConfig) (*HybridCache, error) {
 		stats: CacheStats{
 			LastUpdated: time.Now(),
 		},
+		startTime: time.Now(),
 	}
 
 	// Initialize in-memory cache if enabled
@@ -251,3 +287,136 @@ func (hc *HybridCache) recordError() {
 var (
 	ErrCacheMiss = fmt.Errorf("cache miss")
 )
+
+// HealthCheck performs comprehensive cache health check
+func (hc *HybridCache) HealthCheck(ctx context.Context) CacheHealth {
+	hc.mu.RLock()
+	startTime := hc.startTime
+	hc.mu.RUnlock()
+
+	health := CacheHealth{
+		Stats:    hc.GetStats(),
+		Uptime:   time.Since(startTime),
+		LastTest: time.Now(),
+	}
+
+	// Check memory cache health
+	health.Memory = hc.checkMemoryHealth()
+
+	// Check Redis cache health
+	health.Redis = hc.checkRedisHealth(ctx)
+
+	// Determine overall health
+	health.Overall = hc.determineOverallHealth(health.Memory, health.Redis)
+
+	return health
+}
+
+// checkMemoryHealth evaluates in-memory cache health
+func (hc *HybridCache) checkMemoryHealth() MemoryCacheHealth {
+	health := MemoryCacheHealth{
+		Enabled: hc.config.EnableMemory,
+		Status:  "unhealthy",
+	}
+
+	if !hc.config.EnableMemory || hc.memoryCache == nil {
+		health.Status = "disabled"
+		return health
+	}
+
+	// Get memory cache statistics
+	currentSize := hc.memoryCache.size()
+	maxSize := hc.memoryCache.maxSize
+
+	health.Size = currentSize
+	health.MaxSize = maxSize
+	health.Status = "healthy"
+
+	if maxSize > 0 {
+		health.UtilPct = float64(currentSize) / float64(maxSize) * 100
+
+		// Consider it degraded if utilization is very high
+		if health.UtilPct > 90 {
+			health.Status = "degraded"
+		}
+	}
+
+	return health
+}
+
+// checkRedisHealth evaluates Redis cache health
+func (hc *HybridCache) checkRedisHealth(ctx context.Context) RedisCacheHealth {
+	health := RedisCacheHealth{
+		Enabled:   hc.config.EnableRedis,
+		Status:    "unhealthy",
+		Connected: false,
+		Address:   hc.config.RedisAddr,
+	}
+
+	if !hc.config.EnableRedis || hc.redisCache == nil {
+		health.Status = "disabled"
+		return health
+	}
+
+	// Test Redis connection with ping
+	start := time.Now()
+	err := hc.redisCache.healthCheck(ctx)
+	health.Latency = time.Since(start)
+
+	if err != nil {
+		health.Status = "unhealthy"
+		health.Connected = false
+		health.Error = err.Error()
+	} else {
+		health.Status = "healthy"
+		health.Connected = true
+
+		// Consider it degraded if latency is high
+		if health.Latency > 50*time.Millisecond {
+			health.Status = "degraded"
+		}
+	}
+
+	return health
+}
+
+// determineOverallHealth calculates overall cache system health
+func (hc *HybridCache) determineOverallHealth(memory MemoryCacheHealth, redis RedisCacheHealth) string {
+	// If both are disabled, overall is unhealthy
+	if (!memory.Enabled || memory.Status == "disabled") &&
+		(!redis.Enabled || redis.Status == "disabled") {
+		return "unhealthy"
+	}
+
+	// Count healthy/degraded components
+	healthyComponents := 0
+	degradedComponents := 0
+	totalEnabled := 0
+
+	if memory.Enabled && memory.Status != "disabled" {
+		totalEnabled++
+		if memory.Status == "healthy" {
+			healthyComponents++
+		} else if memory.Status == "degraded" {
+			degradedComponents++
+		}
+	}
+
+	if redis.Enabled && redis.Status != "disabled" {
+		totalEnabled++
+		if redis.Status == "healthy" {
+			healthyComponents++
+		} else if redis.Status == "degraded" {
+			degradedComponents++
+		}
+	}
+
+	// Determine overall status
+	if healthyComponents == totalEnabled {
+		return "healthy"
+	} else if healthyComponents+degradedComponents == totalEnabled {
+		return "degraded"
+	} else {
+		return "unhealthy"
+	}
+}
