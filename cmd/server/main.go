@@ -11,6 +11,7 @@ import (
 	"time"
 
 	kitlog "github.com/go-kit/log"
+	"github.com/prajwalbharadwajbm/adbeacon/internal/cache"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/config"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/database"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/endpoint"
@@ -52,13 +53,19 @@ func main() {
 	}()
 	log.Println("Database initialized successfully")
 
-	// Repository layer (data access) with metrics
-	baseRepo := repository.NewPostgresRepository(db)
-	campaignRepo := repository.NewInstrumentedRepository(baseRepo, prometheusMetrics)
+	// Add cache initialization example
+	cache, err := initializeCache()
+	if err != nil {
+		log.Fatalf("Failed to initialize cache: %v", err)
+	}
+	log.Println("Cache initialized successfully")
+
+	// Repository layer (data access) with caching
+	cachedRepo := setupCachedRepository(db, cache)
 
 	// Service layer with middleware
 	var deliveryService service.DeliveryService
-	deliveryService = service.NewDeliveryService(campaignRepo)
+	deliveryService = service.NewDeliveryService(cachedRepo)
 	deliveryService = middleware.NewServiceMetricsMiddleware(prometheusMetrics)(deliveryService)
 	deliveryService = middleware.NewLoggingMiddleware(logger)(deliveryService)
 
@@ -117,4 +124,31 @@ func main() {
 	} else {
 		log.Println("Server exited gracefully")
 	}
+}
+
+// Add cache initialization example
+func initializeCache() (*cache.HybridCache, error) {
+	cacheConfig := config.GetCacheConfig()
+
+	hybridCache, err := cache.NewHybridCache(cacheConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize cache: %w", err)
+	}
+
+	return hybridCache, nil
+}
+
+// Add this to show how to wire up cached repository
+func setupCachedRepository(db *database.DB, hybridCache *cache.HybridCache) service.CampaignRepository {
+	// Original repository
+	baseRepo := repository.NewPostgresRepository(db)
+
+	// Wrap with instrumentation
+	prometheusMetrics := metrics.NewPrometheusMetrics()
+	instrumentedRepo := repository.NewInstrumentedRepository(baseRepo, prometheusMetrics)
+
+	// Wrap with caching (5-minute TTL)
+	cachedRepo := cache.NewCachedRepository(instrumentedRepo, hybridCache, 5*time.Minute)
+
+	return cachedRepo
 }
