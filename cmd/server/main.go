@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	kitlog "github.com/go-kit/log"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/cache"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/config"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/database"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/endpoint"
+	"github.com/prajwalbharadwajbm/adbeacon/internal/logger"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/metrics"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/middleware"
 	"github.com/prajwalbharadwajbm/adbeacon/internal/repository"
@@ -31,11 +31,10 @@ func init() {
 }
 
 func main() {
-	// Create go-kit logger
-	logger := kitlog.NewLogfmtLogger(os.Stderr)
-	logger = kitlog.With(logger, "ts", kitlog.DefaultTimestampUTC)
-	logger = kitlog.With(logger, "caller", kitlog.DefaultCaller)
-	logger = kitlog.With(logger, "service", "adbeacon", "version", VERSION)
+	logger := logger.New(logger.Config{
+		Service: "adbeacon",
+		Version: VERSION,
+	})
 
 	// Initialize Prometheus metrics
 	prometheusMetrics := metrics.NewPrometheusMetrics()
