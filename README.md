@@ -12,7 +12,7 @@ A high-performance ad delivery system with hybrid caching and comprehensive moni
 
 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/prajwalbharadwajbm/adbeacon.git
 cd adbeacon
 ```
 
