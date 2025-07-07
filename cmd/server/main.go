@@ -36,9 +36,20 @@ func main() {
 		Version: VERSION,
 	})
 
-	// Initialize Prometheus metrics
-	prometheusMetrics := metrics.NewPrometheusMetrics()
-	log.Println("Prometheus metrics initialized")
+	// Initialize Prometheus metrics with caching
+	// This is a pre-cached metrics instance that can be used to avoid creating new metrics instances for each request
+	// This is useful for performance:
+	// According to the Prometheus documentation for java client:
+	// https://www.robustperception.io/label-lookups-and-the-child/
+	// 		Label lookup: ~30ns per operation (uncontended)
+	// 		Direct metric access: ~12ns per operation
+	// 		Under contention: Label lookup can be 5x slower (~102ns vs ~18ns)
+	// For your 1000 requests/second scenario:
+	// 		Without caching: 2000 × 30ns = 60,000ns = 0.06ms per second
+	// 		With caching: 2000 × 12ns = 24,000ns = 0.024ms per second
+	// That's a 60% reduction in metrics overhead!
+	prometheusMetrics := metrics.NewCachedMetrics()
+	log.Println("Cached Prometheus metrics initialized")
 
 	// Initialize database
 	db, dbCleanup, err := database.Initialize(config.AppConfigInstance.DatabaseConfig, "./migrations")
@@ -138,7 +149,7 @@ func initializeCache() (*cache.HybridCache, error) {
 }
 
 // Add this to show how to wire up cached repository
-func setupCachedRepository(db *database.DB, hybridCache *cache.HybridCache, prometheusMetrics *metrics.Metrics) service.CampaignRepository {
+func setupCachedRepository(db *database.DB, hybridCache *cache.HybridCache, prometheusMetrics *metrics.CachedMetrics) service.CampaignRepository {
 	// Original repository
 	baseRepo := repository.NewPostgresRepository(db)
 
