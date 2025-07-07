@@ -12,11 +12,11 @@ import (
 // InstrumentedRepository wraps a repository with metrics collection
 type InstrumentedRepository struct {
 	next    service.CampaignRepository
-	metrics *metrics.Metrics
+	metrics *metrics.CachedMetrics
 }
 
 // NewInstrumentedRepository creates a new instrumented repository
-func NewInstrumentedRepository(repo service.CampaignRepository, metrics *metrics.Metrics) service.CampaignRepository {
+func NewInstrumentedRepository(repo service.CampaignRepository, metrics *metrics.CachedMetrics) service.CampaignRepository {
 	return &InstrumentedRepository{
 		next:    repo,
 		metrics: metrics,

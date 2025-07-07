@@ -10,12 +10,12 @@ import (
 
 // serviceMetricsMiddleware implements metrics collection for DeliveryService
 type serviceMetricsMiddleware struct {
-	metrics *metrics.Metrics
+	metrics *metrics.CachedMetrics
 	next    service.CampaignDeliveryService
 }
 
 // NewServiceMetricsMiddleware creates a new service metrics middleware
-func NewServiceMetricsMiddleware(metrics *metrics.Metrics) func(service.CampaignDeliveryService) service.CampaignDeliveryService {
+func NewServiceMetricsMiddleware(metrics *metrics.CachedMetrics) func(service.CampaignDeliveryService) service.CampaignDeliveryService {
 	return func(next service.CampaignDeliveryService) service.CampaignDeliveryService {
 		return &serviceMetricsMiddleware{
 			metrics: metrics,

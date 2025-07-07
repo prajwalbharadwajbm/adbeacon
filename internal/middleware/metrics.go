@@ -11,11 +11,11 @@ import (
 
 // MetricsMiddleware wraps HTTP handlers to collect Prometheus metrics
 type MetricsMiddleware struct {
-	metrics *metrics.Metrics
+	metrics *metrics.CachedMetrics
 }
 
 // NewMetricsMiddleware creates a new metrics middleware
-func NewMetricsMiddleware(metrics *metrics.Metrics) *MetricsMiddleware {
+func NewMetricsMiddleware(metrics *metrics.CachedMetrics) *MetricsMiddleware {
 	return &MetricsMiddleware{
 		metrics: metrics,
 	}
