@@ -68,6 +68,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize cache: %v", err)
 	}
+	defer func() {
+		log.Println("Closing cache...")
+		if err := cache.Close(); err != nil {
+			log.Printf("Error closing cache: %v", err)
+		}
+		log.Println("Cache closed")
+	}()
 	log.Println("Cache initialized successfully")
 
 	// Repository layer (data access) with caching

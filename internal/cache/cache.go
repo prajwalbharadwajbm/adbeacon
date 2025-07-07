@@ -395,18 +395,20 @@ func (hc *HybridCache) determineOverallHealth(memory MemoryCacheHealth, redis Re
 
 	if memory.Enabled && memory.Status != "disabled" {
 		totalEnabled++
-		if memory.Status == "healthy" {
+		switch memory.Status {
+		case "healthy":
 			healthyComponents++
-		} else if memory.Status == "degraded" {
+		case "degraded":
 			degradedComponents++
 		}
 	}
 
 	if redis.Enabled && redis.Status != "disabled" {
 		totalEnabled++
-		if redis.Status == "healthy" {
+		switch redis.Status {
+		case "healthy":
 			healthyComponents++
-		} else if redis.Status == "degraded" {
+		case "degraded":
 			degradedComponents++
 		}
 	}
@@ -419,4 +421,27 @@ func (hc *HybridCache) determineOverallHealth(memory MemoryCacheHealth, redis Re
 	} else {
 		return "unhealthy"
 	}
+}
+
+// Close closes the cache
+func (hc *HybridCache) Close() error {
+	var errs []error
+
+	// Close memory cache
+	if hc.memoryCache != nil {
+		hc.memoryCache.close()
+	}
+
+	// Close Redis cache
+	if hc.redisCache != nil {
+		if err := hc.redisCache.close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("cache close errors: %v", errs)
+	}
+
+	return nil
 }
