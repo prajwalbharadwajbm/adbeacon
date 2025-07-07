@@ -14,6 +14,11 @@ import (
 )
 
 // DB holds the database connection
+// This is a wrapper around the sql.DB
+// Advantages:
+//   - The wrapper provides a clean abstraction over the standard database package.
+//     We can later switch database drivers, implement custom error handling etc.
+//   - We can add additional methods to the database connection while having original methods available
 type DB struct {
 	*sql.DB
 }
