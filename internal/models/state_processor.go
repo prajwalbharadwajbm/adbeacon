@@ -12,7 +12,7 @@ type StateProcessor struct {
 }
 
 // NewStateProcessor creates a new state processor
-func NewStateProcessor() DimensionProcessor {
+func NewStateProcessor() *StateProcessor {
 	return &StateProcessor{
 		countryStates: getCountryStatesMapping(),
 	}

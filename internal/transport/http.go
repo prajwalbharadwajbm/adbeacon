@@ -57,6 +57,7 @@ func decodeGetCampaignsRequest(_ context.Context, r *http.Request) (interface{},
 			App:     query.Get("app"),
 			Country: query.Get("country"),
 			OS:      query.Get("os"),
+			State:   query.Get("state"),
 		},
 	}
 
