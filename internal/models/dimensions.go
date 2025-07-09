@@ -37,6 +37,7 @@ func NewDimensionRegistry() *DimensionRegistry {
 	registry.RegisterProcessor(NewCountryProcessor())
 	registry.RegisterProcessor(NewOSProcessor())
 	registry.RegisterProcessor(NewAppProcessor())
+	registry.RegisterProcessor(NewStateProcessor())
 
 	return registry
 }
@@ -131,7 +132,13 @@ func (cm *CampaignMatcher) dimensionMatches(req DeliveryRequest, rules []Targeti
 		}
 	}
 
-	// Get the request value for this dimension
+	// Check if this is a dependent dimension processor
+	if depProcessor, ok := processor.(DependentDimensionProcessor); ok {
+		return cm.matchesDependentDimension(req, includeRules, excludeRules, depProcessor)
+	}
+
+	// Original logic for regular dimensions
+	// Problem: State is processed both in dependencyDimension as well as Indepent Dimension
 	requestValue := processor.GetValue(req)
 	if requestValue == "" {
 		return len(includeRules) == 0 // No value means only match if no include rules
@@ -161,6 +168,38 @@ func (cm *CampaignMatcher) dimensionMatches(req DeliveryRequest, rules []Targeti
 	return true
 }
 
+// matchesDependentDimension handles matching for dependent dimensions
+func (cm *CampaignMatcher) matchesDependentDimension(req DeliveryRequest, includeRules, excludeRules []TargetingRule, processor DependentDimensionProcessor) bool {
+	requestValue := processor.GetValue(req)
+	if requestValue == "" {
+		return len(includeRules) == 0 // No value means only match if no include rules
+	}
+
+	// If there are include rules, request must match at least one
+	// include rules will have higher precedence
+	if len(includeRules) > 0 {
+		matched := false
+		for _, rule := range includeRules {
+			if processor.MatchesRuleWithDependencies(rule, req) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// If there are exclude rules, request must not match any
+	for _, rule := range excludeRules {
+		if processor.MatchesRuleWithDependencies(rule, req) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // ValidateTargetingRule validates a targeting rule using the appropriate processor
 func (cm *CampaignMatcher) ValidateTargetingRule(rule TargetingRule) error {
 	processor, exists := cm.Registry.GetProcessor(string(rule.Dimension))
@@ -180,4 +219,10 @@ func (cm *CampaignMatcher) BuildIndexKey(dimensionName, value string) string {
 
 	normalizedValue := processor.NormalizeValue(value)
 	return fmt.Sprintf("index:%s:%s", dimensionName, normalizedValue)
+}
+
+// ValidateRuleWithDependencies validates a rule considering its dependencies
+func (dr *DimensionRegistry) ValidateRuleWithDependencies(rule TargetingRule, allRules []TargetingRule) error {
+	validator := NewDependencyValidator(dr)
+	return validator.ValidateRuleWithDependencies(rule, allRules)
 }

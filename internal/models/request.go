@@ -11,6 +11,7 @@ type DeliveryRequest struct {
 	Country string `json:"country" validate:"required,len=2"`
 	OS      string `json:"os" validate:"required,oneof=android ios"`
 	App     string `json:"app" validate:"required"`
+	State   string `json:"state,omitempty"` // I have kept this omit emtpy as this can be optional.
 }
 
 // Validate validates the delivery request
@@ -27,6 +28,7 @@ func (dr *DeliveryRequest) Validate() error {
 	if dr.App == "" {
 		return errors.New("app is required")
 	}
+	// Not doing any validation as state can be empty
 	return nil
 }
 
@@ -34,7 +36,8 @@ func (dr *DeliveryRequest) Validate() error {
 func (dr *DeliveryRequest) NormalizeValues() {
 	dr.Country = strings.ToLower(strings.TrimSpace(dr.Country))
 	dr.OS = strings.ToLower(strings.TrimSpace(dr.OS))
-	dr.App = strings.TrimSpace(dr.App) // App IDs are case-sensitive
+	dr.App = strings.TrimSpace(dr.App)                      // App IDs are case-sensitive
+	dr.State = strings.ToLower(strings.TrimSpace(dr.State)) // State codes are normalized
 }
 
 // ToMap converts the request to a map for extensible dimension processing
@@ -43,6 +46,7 @@ func (dr *DeliveryRequest) ToMap() map[string]string {
 		"country": dr.Country,
 		"os":      dr.OS,
 		"app":     dr.App,
+		"state":   dr.State,
 	}
 }
 
@@ -55,6 +59,8 @@ func (dr *DeliveryRequest) GetDimensionValue(dimension string) string {
 		return dr.OS
 	case "app":
 		return dr.App
+	case "state":
+		return dr.State
 	default:
 		// For extensible dimensions, return empty (can be extended later)
 		return ""

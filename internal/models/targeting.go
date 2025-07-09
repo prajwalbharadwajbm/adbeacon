@@ -25,6 +25,7 @@ const (
 	DimensionCountry TargetDimension = "country"
 	DimensionOS      TargetDimension = "os"
 	DimensionApp     TargetDimension = "app"
+	DimensionState   TargetDimension = "state"
 
 	// Extended dimensions (examples)
 	DimensionDeviceType TargetDimension = "device_type"
