@@ -175,6 +175,20 @@ func (cm *CampaignMatcher) matchesDependentDimension(req DeliveryRequest, includ
 		return len(includeRules) == 0 // No value means only match if no include rules
 	}
 
+	// For state processor, validate that the state is valid for the country
+	// If invalid, this campaign should not match at all
+	if processor.GetName() == "state" {
+		// Check if the state is valid by attempting to validate any rule
+		// Use a dummy rule to test state validity
+		dummyRule := TargetingRule{Values: []string{requestValue}}
+		if err := processor.(interface {
+			ValidateWithDependencies(rule TargetingRule, request DeliveryRequest) error
+		}).ValidateWithDependencies(dummyRule, req); err != nil {
+			// Invalid state for this country, no campaigns with state rules should match
+			return false
+		}
+	}
+
 	// If there are include rules, request must match at least one
 	// include rules will have higher precedence
 	if len(includeRules) > 0 {
